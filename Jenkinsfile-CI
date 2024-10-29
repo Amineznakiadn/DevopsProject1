@@ -68,36 +68,35 @@ pipeline {
             } 
         }
 
-        stage('8. Trivy Image Scan') {
-            
-            steps{
-                script { 
-                  def JOB = env.JOB_NAME.toLowerCase() 
-                  sh "trivy image ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER} > scan.txt"
-                }
-            }
+stage('8. Trivy Image Scan') {
+    steps {
+        script { 
+            def JOB = env.JOB_NAME.toLowerCase()
+            // Run Trivy scan with --skip-update to avoid DB update issues
+            sh "trivy image --skip-update ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER} > scan.txt"
         }
+    }
+}
 
-        stage('9. Docker Image Push') {
-            steps{
-                script { 
-                  withCredentials([usernamePassword(credentialsId: 'my_dockerhub_creds', usernameVariable: 'docker_user', passwordVariable: 'docker_pass')]) {
-                    sh "docker login -u '${docker_user}' -p '${docker_pass}'"
-                    def JOB = env.JOB_NAME.toLowerCase() 
-                    sh "docker push ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER}"
-                    sh "docker push ${DOCKER_USERNAME}/${JOB}:latest"
-                  }
-                }
-            }
-        }
-
-        stage('10. Docker Image Cleanup') {
-            // Remove the unwanted (dangling) images created in Jenkins Server to free-up space
-            steps{
-                script { 
-                  sh "docker image prune -af"
-                }
+stage('9. Docker Image Push') {
+    steps {
+        script { 
+            withCredentials([usernamePassword(credentialsId: 'my_dockerhub_creds', usernameVariable: 'docker_user', passwordVariable: 'docker_pass')]) {
+                sh "docker login -u '${docker_user}' -p '${docker_pass}'"
+                def JOB = env.JOB_NAME.toLowerCase()
+                sh "docker push ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER}"
+                sh "docker push ${DOCKER_USERNAME}/${JOB}:latest"
             }
         }
     }
 }
+
+stage('10. Docker Image Cleanup') {
+    // Remove the unwanted (dangling) images created in Jenkins Server to free up space
+    steps {
+        script { 
+            sh "docker image prune -af"
+        }
+    }
+}
+
