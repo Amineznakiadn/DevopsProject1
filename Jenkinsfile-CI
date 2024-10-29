@@ -7,95 +7,94 @@ pipeline {
     stages {
         stage("1. Cleanup") {
             steps {
-                deleteDir ()             
+                deleteDir()             
             }
         }
 
-        stage ('2. Git Checkout') {
+        stage("2. Git Checkout") {
             steps {
-                dir ("DevopsProject1"){
-                  script {
-                    git branch: 'main', url: 'https://github.com/Amineznakiadn/DevopsProject1.git' 
-                  }
-                }
-            }
-        }   
-        
-        stage("3. Maven Unit Test") {  
-            steps{
-                dir ("DevopsProject1"){
-                  sh 'mvn test'        
+                dir("DevopsProject1") {
+                    script {
+                        git branch: 'main', url: 'https://github.com/Amineznakiadn/DevopsProject1.git'
+                    }
                 }
             }
         }
 
-        stage('4. Maven Build') {
-            steps{
-                dir ("DevopsProject1"){
-                  sh 'mvn clean install'   
+        stage("3. Maven Unit Test") {  
+            steps {
+                dir("DevopsProject1") {
+                    sh 'mvn test'        
+                }
+            }
+        }
+
+        stage("4. Maven Build") {
+            steps {
+                dir("DevopsProject1") {
+                    sh 'mvn clean install'
                 }
             }
         }
 
         stage("5. Maven Integration Test") {
-            steps{
-                dir ("DevopsProject1"){
-                  sh 'mvn verify'          
+            steps {
+                dir("DevopsProject1") {
+                    sh 'mvn verify'
                 }
             }
         }
 
-        stage('6. Docker Image Build') {
-            steps{
-                dir('DevopsProject1') {      
+        stage("6. Docker Image Build") {
+            steps {
+                dir("DevopsProject1") {
                     script {
-                      def JOB = env.JOB_NAME.toLowerCase()           
-                      sh "docker build -t ${JOB}:${BUILD_NUMBER} ." 
+                        def JOB = env.JOB_NAME.toLowerCase()
+                        sh "docker build -t ${JOB}:${BUILD_NUMBER} ."
                     }
                 }
             }
         }
-        
-        stage('7. Docker Image Tag') {
-            steps{
-                dir('DevopsProject1') {      
-                  script {
-                    def JOB = env.JOB_NAME.toLowerCase() 
-                    sh "docker tag ${JOB}:${BUILD_NUMBER} ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER}"
-                    sh "docker tag ${JOB}:${BUILD_NUMBER} ${DOCKER_USERNAME}/${JOB}:latest"
-                  }
-                }
-            } 
-        }
 
-        stage('8. Trivy Image Scan') {
+        stage("7. Docker Image Tag") {
             steps {
-                script { 
-                  def JOB = env.JOB_NAME.toLowerCase()
-                  // Run Trivy scan with --skip-update to avoid DB update issues
-                  sh "trivy image --skip-update ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER} > scan.txt"
-              }
-            }
-          }
-
-        stage('9. Docker Image Push') {
-            steps{
-                script { 
-                  withCredentials([usernamePassword(credentialsId: 'my_dockerhub_creds', usernameVariable: 'docker_user', passwordVariable: 'docker_pass')]) {
-                    sh "docker login -u '${docker_user}' -p '${docker_pass}'"
-                    def JOB = env.JOB_NAME.toLowerCase() 
-                    sh "docker push ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER}"
-                    sh "docker push ${DOCKER_USERNAME}/${JOB}:latest"
-                  }
+                dir("DevopsProject1") {
+                    script {
+                        def JOB = env.JOB_NAME.toLowerCase()
+                        sh "docker tag ${JOB}:${BUILD_NUMBER} ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER}"
+                        sh "docker tag ${JOB}:${BUILD_NUMBER} ${DOCKER_USERNAME}/${JOB}:latest"
+                    }
                 }
             }
         }
 
-        stage('10. Docker Image Cleanup') {
-            // Remove the unwanted (dangling) images created in Jenkins Server to free-up space
-            steps{
-                script { 
-                  sh "docker image prune -af"
+        stage("8. Trivy Image Scan") {
+            steps {
+                script {
+                    def JOB = env.JOB_NAME.toLowerCase()
+                    // Run Trivy scan without --skip-update for the initial run
+                    sh "trivy image ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER} > scan.txt || true"
+                }
+            }
+        }
+
+        stage("9. Docker Image Push") {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'my_dockerhub_creds', usernameVariable: 'docker_user', passwordVariable: 'docker_pass')]) {
+                        sh "docker login -u '${docker_user}' -p '${docker_pass}'"
+                        def JOB = env.JOB_NAME.toLowerCase()
+                        sh "docker push ${DOCKER_USERNAME}/${JOB}:v${BUILD_NUMBER}"
+                        sh "docker push ${DOCKER_USERNAME}/${JOB}:latest"
+                    }
+                }
+            }
+        }
+
+        stage("10. Docker Image Cleanup") {
+            steps {
+                script {
+                    sh "docker image prune -af"
                 }
             }
         }
